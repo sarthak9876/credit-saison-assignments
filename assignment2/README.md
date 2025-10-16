@@ -1,5 +1,6 @@
-🧩 **Assignment 2 — AMI Lifecycle Automation**
-🧠** Objective**
+**🧩 Assignment 2 — AMI Lifecycle Automation**
+
+**🧠 Objective**
 
 Automate the cleanup of AMIs created with tag **CreatedBy:AMILifecycle** — keeping only recent AMIs and deleting older ones.
 
