@@ -6,7 +6,7 @@ variable "aws_region" {
 variable "my_ip" {
   description = "Your public IP in CIDR format (e.g. 203.0.113.45/32)"
   type        = string
-  default     = "3.93.67.6/32"
+  default     = "54.86.135.197/32"
 }
 
 variable "bucket_name" {
