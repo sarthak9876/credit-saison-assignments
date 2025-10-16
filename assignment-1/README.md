@@ -1,7 +1,116 @@
-This is README for assignment1 along with success screenshots.
+🧩 Assignment 1 — S3 Bucket with IP Restriction and SSE-KMS Encryption
 
-**Brief**:
-For Task 1 I used Terraform to create a private S3 bucket and a customer-managed KMS key. I enforced encryption with SSE-KMS and enabled S3 Bucket Keys for lower KMS cost. I added a bucket policy that only allows access from my instance public IP (checked using curl ifconfig.me and added in variables.tf file or can be passed during terraform apply with -var tag) and explicitly denied other IPs. I also set the S3 Public Access Block to prevent accidental public exposure. To verify, I ran aws s3api get-bucket-encryption and attempted access from another machine to demonstrate AccessDenied.
+🧠 **Objective**
+**Create a secure S3 bucket that:**
+
+  1. Is private (no public access),
+  
+  2. Is only accessible from specific IP addresses,
+  
+  3. Uses SSE-KMS encryption with a customer-managed KMS key,
+  
+  4. Has enforced encryption through bucket policies.
+
+⚙️ **Implementation Overview**
+
+**Tools Used**: Terraform, AWS CLI, KMS, S3
+
+Steps Performed:
+
+  1. Created a customer-managed KMS key
+  
+     i. Type: Symmetric
+      
+     ii. Usage: ENCRYPT_DECRYPT
+      
+     iii. Key rotation enabled for best practices.
+  
+  2. Created an alias alias/s3encryptionkey for easier key reference.
+  
+  3. Created an S3 bucket using Terraform.
+  
+  4. Applied default bucket encryption using the KMS key (SSE-KMS).
+  
+  5. Added bucket policy to:
+  
+      i. Deny uploads without encryption headers,
+      
+      ii. Restrict access to specific IPs.
+  
+  6. Tested manually using AWS CLI:
+```
+aws s3 cp testfile.txt s3://<bucket-name>/ --sse aws:kms --sse-kms-key-id alias/s3encryptionkey
+aws s3api head-object --bucket <bucket-name> --key testfile.txt --query ServerSideEncryption
+```
+
+Verified output: "aws:kms"
+
+🧱 Terraform Structure
+```
+provider "aws" {
+  region = "ap-south-1"
+}
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key" "s3_encryption_key" {
+  description             = "Key for S3 encryption"
+  key_usage               = "ENCRYPT_DECRYPT"
+  customer_master_key_spec = "SYMMETRIC_DEFAULT"
+  enable_key_rotation     = true
+}
+
+resource "aws_kms_alias" "s3_key_alias" {
+  name          = "alias/s3encryptionkey"
+  target_key_id = aws_kms_key.s3_encryption_key.key_id
+}
+
+resource "aws_s3_bucket" "secure_bucket" {
+  bucket = "s3-secure-${data.aws_caller_identity.current.account_id}"
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "default" {
+  bucket = aws_s3_bucket.secure_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.s3_encryption_key.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "enforce_encryption" {
+  bucket = aws_s3_bucket.secure_bucket.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyUnEncryptedObjectUploads"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.secure_bucket.arn}/*"
+        Condition = {
+          StringNotEquals = {
+            "s3:x-amz-server-side-encryption" = "aws:kms"
+          }
+        }
+      }
+    ]
+  })
+}
+
+```
+
+🧩 Verification
+
+✅ Bucket created successfully
+✅ File uploads encrypted automatically
+✅ Access denied from non-whitelisted IPs
+✅ Policy prevents unencrypted uploads
+
+**Screenshots**
 
 1. **When trying to list contents of S3 bucket from IP which is not allowed, it is throwing error of AccessDenied.**
 <img width="1700" height="137" alt="Screenshot 2025-10-16 at 6 28 26 PM" src="https://github.com/user-attachments/assets/51ce42d7-b8bc-4fae-ac64-bc8ba993c34b" />
